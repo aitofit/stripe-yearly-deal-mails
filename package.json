@@ -1,0 +1,22 @@
+{
+  "name": "send-mails",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "set NODE_ENV=development&& node index.js",
+    "run-prod": "set NODE_ENV=production&& node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "cli-progress": "^3.12.0",
+    "csv-parser": "^3.1.0",
+    "dotenv": "^16.4.7",
+    "mongodb": "^6.12.0",
+    "nodemailer": "^6.9.16",
+    "nodemailer-sendgrid": "^1.0.3"
+  }
+}
