@@ -4,7 +4,7 @@ const createEncodedUrl = (baseUrl, email) => {
   }
 
   const encodedEmail = encodeURIComponent(email)
-  return `${baseUrl}/checkout/:${encodedEmail}`
+  return `${baseUrl}/checkout/${encodedEmail}`
 }
 
 module.exports = { createEncodedUrl }

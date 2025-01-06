@@ -9,11 +9,12 @@ const main = async () => {
   console.log('Updating the target users...')
   await runFindUsers().catch(console.dir)
 
+  // Uncomment if want to only find target users
   // return
 
   console.log('----------------------------------------------------------------------------------')
   console.log('Processing the email queue...')
-  let { queueLen, sentMails } = runEmailQueue().catch(console.dir)
+  let { queueLen, sentMails } = await runEmailQueue().catch(console.dir)
 
   let sumSentMails = sentMails
 

@@ -1,5 +1,8 @@
 // Gather user ids from a collection
 
+const LATELY_UPDATED = 3 // months
+const LATELY_REGISTERED = 14 // days
+
 const MongoClient = require('mongodb').MongoClient
 const cliProgress = require('cli-progress')
 const { readEmails } = require('./readCsvEmails')
@@ -20,7 +23,20 @@ const isLatelyUpdated = (user) => {
   const now = Date.now()
   const diff = now - lastUpdated
   const days = diff / (1000 * 60 * 60 * 24)
-  return days <= 30 * 3 // If updated in the last 3 months return true
+  return days <= 30 * LATELY_UPDATED // If updated in the last 3 months return true
+}
+
+const isLatelyRegistered = (user) => {
+  const registerdAt = user.USER?.[0]?.signUpDate
+  if (!registerdAt) {
+    // If no registration date, return true so that the user is filtered out anyway
+    return true
+  }
+  const registered = new Date(registerdAt).getTime()
+  const now = Date.now()
+  const diff = now - registered
+  const days = diff / (1000 * 60 * 60 * 24)
+  return days <= LATELY_REGISTERED // If registered in the last 14 days return true
 }
 
 const filterOutUsers = (user, bannedEmails, sentEmails) => {
@@ -28,8 +44,12 @@ const filterOutUsers = (user, bannedEmails, sentEmails) => {
   if (bannedEmails.includes(user._id) || sentEmails.includes(user._id)) {
     return false
   }
-  // Check if not updated in the last 3 months
+  // Check if not updated in the last LATELY_UPDATE months
   if (!isLatelyUpdated(user)) {
+    return false
+  }
+  // Check if registered in the last LATELY_REGISTERED days
+  if (!isLatelyRegistered(user)) {
     return false
   }
   // Check if user does not have appstore or play store payment info
@@ -70,11 +90,11 @@ async function run() {
     console.log(`Email queue already contains ${queueEmailList.length} emails`)
 
     // Fetch all documents with only the _id field (email string)
-    const documents = await SentEmailscollection.find({}, { projection: { _id: 1 } }).toArray()
+    const documents = await SentEmailscollection.find({}, { projection: { email: 1 } }).toArray()
     // Extract emails into a simple array
-    const sentEmails = documents.map((doc) => doc._id)
+    const sentEmails = documents.map((doc) => doc.email)
 
-    console.log(`Sent emails already contains ${queueEmailList.length} emails`)
+    console.log(`Sent emails already contains ${sentEmails.length} emails`)
 
     // Combine the banned emails, sent emails and emails in the queue
     const emailList = sentEmails.concat(queueEmailList)

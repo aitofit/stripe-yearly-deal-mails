@@ -164,30 +164,35 @@ async function run() {
     const emailQueue = await getQueuedEmails()
     if (emailQueue.length === 0) {
       console.log('No emails in queue to send.')
+      queueLen = 0
+      sentMails = 0
+    } else {
+      console.log(`Sending ${emailQueue.length} emails... (limited to 150 at a time)`)
+      const results = await sendQueuedEmails(emailQueue)
+      const idsEmailWasSent = getIdsEmailWasSent(results)
+
+      // map the email fields of the documents with the given ids
+      const emailsSent = emailQueue.filter((doc) => idsEmailWasSent.includes(doc._id))
+
+      // Save all ids and emails of sent emails to the database
+      await client
+        .db()
+        .collection('SentYearDealEmails')
+        .insertMany(emailsSent.map((sentMail) => ({ _id: sentMail._id, email: sentMail.email })))
+
+      console.log('Emails sent:', idsEmailWasSent.length)
+      console.log('Emails not sent:', emailQueue.length - idsEmailWasSent.length)
+      console.log("Sent email's ids saved to the database")
+
+      if (emailQueue.length > idsEmailWasSent.length) {
+        throw new Error('All emails were not sent.')
+      }
+
+      await removeFromEmailQueue(idsEmailWasSent)
+
+      queueLen = emailQueue.length
+      sentMails = idsEmailWasSent.length
     }
-
-    console.log(`Sending ${emailQueue.length} emails... (limited to 150 at a time)`)
-    const results = await sendQueuedEmails(emailQueue)
-    const idsEmailWasSent = getIdsEmailWasSent(results)
-
-    // Save all ids of sent emails to the database
-    await client
-      .db()
-      .collection('SentYearDealEmails')
-      .insertMany(idsEmailWasSent.map((id) => ({ _id: id })))
-
-    console.log('Emails sent:', idsEmailWasSent.length)
-    console.log('Emails not sent:', emailQueue.length - idsEmailWasSent.length)
-    console.log("Sent email's ids saved to the database")
-
-    if (emailQueue.length > idsEmailWasSent.length) {
-      throw new Error('All emails were not sent.')
-    }
-
-    await removeFromEmailQueue(idsEmailWasSent)
-
-    queueLen = emailQueue.length
-    sentMails = idsEmailWasSent.length
   } catch (error) {
     throw error
   } finally {
