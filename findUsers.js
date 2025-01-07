@@ -14,9 +14,30 @@ const writeToLocalDBOnly = true // Do not do any writing operations to prod db i
 const localUri = 'mongodb://0.0.0.0:27017?directConnection=true' // local mongodb probably needs the directConnection flag set
 
 const client = new MongoClient(process.env.DB_URI, {
-  connectTimeoutMS: 30000,
+  connectTimeoutMS: 60000,
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 60000,
+  socketTimeoutMS: 60000,
+  // maxPoolSize: 10, // Maximum of 10 connections in the pool
 })
 const localClient = new MongoClient(localUri, { connectTimeoutMS: 30000 })
+
+// retry logic for transient errors like ECONNRESET
+const retryOperation = async (operation, retries = 3) => {
+  while (retries > 0) {
+    try {
+      return await operation()
+    } catch (err) {
+      if (err.code === 'ECONNRESET' && retries > 1) {
+        retries -= 1
+        console.log(`Retrying operation... ${retries} retries left.`)
+      } else {
+        throw err
+      }
+    }
+  }
+}
 
 const isLatelyUpdated = (user) => {
   const lastUpdated = new Date(user.LAST_UPDATED).getTime()
@@ -67,6 +88,7 @@ const filterOutUsers = (user, bannedEmails, sentEmails) => {
 }
 
 async function run() {
+  let i = 0
   try {
     // Read the "banned" emails from the CSV file
     const bannedEmails = await readEmails('banned_emails.csv')
@@ -100,10 +122,37 @@ async function run() {
     const emailList = sentEmails.concat(queueEmailList)
 
     const query = {}
-    const usersCursor = await USERS.find(query)
+    // const query = {
+    //   $and: [
+    //     {
+    //       LAST_UPDATED: { $gte: new Date(Date.now() - 30 * LATELY_UPDATED * 24 * 60 * 60 * 1000) },
+    //     },
+    //     {
+    //       'USER.0.signUpDate': {
+    //         $lte: new Date(Date.now() - LATELY_REGISTERED * 24 * 60 * 60 * 1000),
+    //       },
+    //     },
+    //     {
+    //       $or: [
+    //         { 'paymentInfo.appStore': { $exists: true } },
+    //         { playStoreData: { $exists: true } },
+    //       ],
+    //     },
+    //     // { 'startflowData.language': /^fi-/i },
+    //   ],
+    // }
+    const projection = {
+      _id: 1,
+      LAST_UPDATED: 1,
+      paymentInfo: 1,
+      playStoreData: 1,
+      startflowData: 1,
+    }
+    const usersCursor = await USERS.find(query, { projection })
 
     console.log('Querying for appropriate users...')
-    let i = 0
+    const userDataList = [] // List to hold all the user data
+    i = 0
     let j = 0
     let timeToSend = new Date()
 
@@ -120,7 +169,8 @@ async function run() {
           timeToSend,
         }
 
-        await TARGET_COLLECTION.insertOne(userData)
+        // await TARGET_COLLECTION.insertOne(userData)
+        userDataList.push(userData)
 
         i += 1
 
@@ -135,8 +185,19 @@ async function run() {
 
     bar1.stop()
 
+    // Insert all gathered data into the database in one operation
+    if (userDataList.length > 0) {
+      console.log(`Inserting ${userDataList.length} users into the target collection...`)
+      await TARGET_COLLECTION.insertMany(userDataList)
+    } else {
+      console.log('No users to insert into the target collection.')
+    }
+
     console.log('\n\n')
     console.log(`In total, ${i} target users saved to new collection.`)
+  } catch (err) {
+    console.log('An error occurred at i:', i)
+    console.error(err)
   } finally {
     // Close the connection after the operations complete
     await client.close()
