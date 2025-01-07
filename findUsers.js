@@ -70,7 +70,7 @@ const filterOutUsers = (user, bannedEmails, sentEmails) => {
     return false
   }
   // Check if registered in the last LATELY_REGISTERED days
-  if (!isLatelyRegistered(user)) {
+  if (isLatelyRegistered(user)) {
     return false
   }
   // Check if user does not have appstore or play store payment info
@@ -147,8 +147,10 @@ async function run() {
       paymentInfo: 1,
       playStoreData: 1,
       startflowData: 1,
+      USER: 1,
     }
     const usersCursor = await USERS.find(query, { projection })
+    // const usersCursor = await USERS.find(query)
 
     console.log('Querying for appropriate users...')
     const userDataList = [] // List to hold all the user data
