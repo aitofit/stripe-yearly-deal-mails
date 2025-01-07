@@ -102,7 +102,7 @@ const sendQueuedEmails = (emailQueue) => {
         emailPromises.push(
           sendEmailPromisified({
             email: next.email,
-            firstName: next.firstName,
+            firstName: next.name,
             stripeLink,
             templateId,
             emailId: next._id,
