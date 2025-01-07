@@ -1,4 +1,5 @@
 // Gather user ids from a collection
+const DEBUG = false
 
 const LATELY_UPDATED = 3 // months
 const LATELY_REGISTERED = 14 // days
@@ -63,24 +64,29 @@ const isLatelyRegistered = (user) => {
 const filterOutUsers = (user, bannedEmails, sentEmails) => {
   // check if banned
   if (bannedEmails.includes(user._id) || sentEmails.includes(user._id)) {
+    DEBUG && console.log('User has banned email:', user._id)
     return false
   }
   // Check if not updated in the last LATELY_UPDATE months
   if (!isLatelyUpdated(user)) {
+    DEBUG && console.log('User not updated lately:', user._id)
     return false
   }
   // Check if registered in the last LATELY_REGISTERED days
   if (isLatelyRegistered(user)) {
+    DEBUG && console.log('User registered lately:', user._id)
     return false
   }
   // Check if user does not have appstore or play store payment info
   if (!user.paymentInfo?.appStore && !user.playStoreData) {
+    DEBUG && console.log('User has no payment info:', user._id)
     return false
   }
   const language = user.startflowData?.language
   const lngLower = language?.trim?.().toLowerCase?.() ?? ''
-  if (language && !lngLower?.startsWith('fi-')) {
+  if (language && !lngLower?.startsWith('fi')) {
     // We want to target only finnish users
+    DEBUG && console.log('User language is not Finnish:', user._id)
     return false
   }
 
@@ -94,6 +100,12 @@ async function run() {
     const bannedEmails = await readEmails('banned_emails.csv')
 
     console.log(`bannedEmails contains ${bannedEmails.length} emails`)
+
+    if (bannedEmails.length < 5) {
+      console.log('Banned emails are the following:')
+      console.log(bannedEmails)
+      console.log('\n')
+    }
 
     const database = client.db(process.env.DB_NAME)
     const USERS = database.collection('USERS')
@@ -116,7 +128,7 @@ async function run() {
     // Extract emails into a simple array
     const sentEmails = documents.map((doc) => doc.email)
 
-    console.log(`Sent emails already contains ${sentEmails.length} emails`)
+    console.log(`Sent emails already contains ${sentEmails.length} emails\n`)
 
     // Combine the banned emails, sent emails and emails in the queue
     const emailList = sentEmails.concat(queueEmailList)
@@ -161,6 +173,7 @@ async function run() {
     // create a new progress bar instance and use shades_classic theme
     const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic)
     bar1.start(await usersCursor.count(), j)
+    DEBUG && console.log('\n')
 
     for await (const user of usersCursor) {
       if (filterOutUsers(user, bannedEmails, emailList)) {
