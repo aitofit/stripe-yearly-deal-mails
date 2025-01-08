@@ -1,8 +1,9 @@
 // Gather user ids from a collection
 const DEBUG = false
 
-const LATELY_UPDATED = 3 // months
+const LATELY_UPDATED = 1 // months
 const LATELY_REGISTERED = 14 // days
+const MAILS_PER_DAY = 500
 
 const MongoClient = require('mongodb').MongoClient
 const cliProgress = require('cli-progress')
@@ -109,6 +110,7 @@ async function run() {
 
     const database = client.db(process.env.DB_NAME)
     const USERS = database.collection('USERS')
+    // if writeToLocalDBOnly is false, this actually points to the production database
     const localDB = writeToLocalDBOnly ? localClient.db('Main') : database
     const TARGET_COLLECTION = localDB.collection('YearDealTargetUsers')
 
@@ -189,8 +191,8 @@ async function run() {
 
         i += 1
 
-        // Adjust timeToSend for every 1000 users
-        if (i % 1000 === 0) {
+        // Adjust timeToSend for every MAILS_PER_DAY emails
+        if (i % MAILS_PER_DAY === 0) {
           timeToSend = new Date(timeToSend.getTime() + 24 * 60 * 60 * 1000) // Add one day
         }
       }

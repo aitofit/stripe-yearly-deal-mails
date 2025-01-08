@@ -3,7 +3,7 @@ const fs = require('fs').promises
 const readEmails = async (fileName) => {
   try {
     const data = await fs.readFile(fileName, 'utf8')
-    const emails = data.split(',').map((email) => email.trim())
+    const emails = data.split('\n').map((email) => email.trim())
 
     return emails
   } catch (err) {
