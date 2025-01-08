@@ -112,7 +112,7 @@ const sendQueuedEmails = (emailQueue) => {
 
       Promise.allSettled(emailPromises).then((results) => resolve(results))
     } catch (error) {
-      throw error
+      console.log(error)
       reject(error)
     }
   })
