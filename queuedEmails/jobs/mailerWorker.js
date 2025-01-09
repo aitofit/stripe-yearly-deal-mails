@@ -204,7 +204,7 @@ async function run() {
 
 const runEmailQueue = async () => {
   // By default disabled in dev env to not load mailing service
-  if (process.env.ENV === 'prodution') {
+  if (process.env.NODE_ENV === 'production') {
     const queueLen = await run()
     return queueLen
   }
