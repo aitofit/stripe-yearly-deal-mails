@@ -10,7 +10,7 @@ const cliProgress = require('cli-progress')
 const { readEmails } = require('./readCsvEmails')
 
 // const production = true
-const writeToLocalDBOnly = true // Do not do any writing operations to prod db if true
+const writeToLocalDBOnly = false // Do not do any writing operations to prod db if true
 
 // Replace the uri string with your MongoDB deployment's connection string
 const localUri = 'mongodb://0.0.0.0:27017?directConnection=true' // local mongodb probably needs the directConnection flag set
