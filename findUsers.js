@@ -25,22 +25,6 @@ const client = new MongoClient(process.env.DB_URI, {
 })
 const localClient = new MongoClient(localUri, { connectTimeoutMS: 30000 })
 
-// retry logic for transient errors like ECONNRESET
-const retryOperation = async (operation, retries = 3) => {
-  while (retries > 0) {
-    try {
-      return await operation()
-    } catch (err) {
-      if (err.code === 'ECONNRESET' && retries > 1) {
-        retries -= 1
-        console.log(`Retrying operation... ${retries} retries left.`)
-      } else {
-        throw err
-      }
-    }
-  }
-}
-
 const isLatelyUpdated = (user) => {
   const lastUpdated = new Date(user.LAST_UPDATED).getTime()
   const now = Date.now()
@@ -100,7 +84,7 @@ async function run() {
     // Read the "banned" emails from the CSV file
     const bannedEmails = await readEmails('banned_emails.csv')
 
-    console.log(`bannedEmails contains ${bannedEmails.length} emails`)
+    console.log(`\nbannedEmails contains ${bannedEmails.length} emails`)
 
     if (bannedEmails.length < 5) {
       console.log('Banned emails are the following:')
@@ -118,8 +102,23 @@ async function run() {
       ? localDB.collection('SentYearDealEmails')
       : database.collection('SentYearDealEmails')
 
-    // Fetch all documents with only the "email" field
-    const queueDocuments = await TARGET_COLLECTION.find({}, { projection: { email: 1 } }).toArray()
+    // Fetch all documents in the queue
+    const queueDocuments = await TARGET_COLLECTION.find({}).toArray()
+
+    const latestDate =
+      queueDocuments.length > 0
+        ? new Date(Math.max(...queueDocuments.map((e) => new Date(e.timeToSend).getTime())))
+        : new Date()
+
+    console.log(`Latest timeToSend in the target collection is ${latestDate}`)
+
+    // Next, count how many queued emails have the date latestDate
+    const count = queueDocuments.filter(
+      (e) => e.timeToSend.getTime() === latestDate.getTime()
+    ).length
+
+    console.log(`There are ${count} emails with the latest timeToSend`)
+
     // Extract emails into a simple array
     const queueEmailList = queueDocuments.map((doc) => doc.email)
 
@@ -136,25 +135,6 @@ async function run() {
     const emailList = sentEmails.concat(queueEmailList)
 
     const query = {}
-    // const query = {
-    //   $and: [
-    //     {
-    //       LAST_UPDATED: { $gte: new Date(Date.now() - 30 * LATELY_UPDATED * 24 * 60 * 60 * 1000) },
-    //     },
-    //     {
-    //       'USER.0.signUpDate': {
-    //         $lte: new Date(Date.now() - LATELY_REGISTERED * 24 * 60 * 60 * 1000),
-    //       },
-    //     },
-    //     {
-    //       $or: [
-    //         { 'paymentInfo.appStore': { $exists: true } },
-    //         { playStoreData: { $exists: true } },
-    //       ],
-    //     },
-    //     // { 'startflowData.language': /^fi-/i },
-    //   ],
-    // }
     const projection = {
       _id: 1,
       LAST_UPDATED: 1,
@@ -164,13 +144,15 @@ async function run() {
       USER: 1,
     }
     const usersCursor = await USERS.find(query, { projection })
-    // const usersCursor = await USERS.find(query)
 
     console.log('Querying for appropriate users...')
     const userDataList = [] // List to hold all the user data
     i = 0
     let j = 0
-    let timeToSend = new Date()
+    // Count how many emails can be added in the queue with the latest timeToSend before adding one day
+    let timeCount = count % MAILS_PER_DAY
+    let timeToSend =
+      timeCount !== 0 ? latestDate : new Date(latestDate.getTime() + 24 * 60 * 60 * 1000) // Add one day
 
     // create a new progress bar instance and use shades_classic theme
     const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic)
@@ -186,13 +168,13 @@ async function run() {
           timeToSend,
         }
 
-        // await TARGET_COLLECTION.insertOne(userData)
         userDataList.push(userData)
 
         i += 1
+        timeCount += 1
 
         // Adjust timeToSend for every MAILS_PER_DAY emails
-        if (i % MAILS_PER_DAY === 0) {
+        if (timeCount % MAILS_PER_DAY === 0) {
           timeToSend = new Date(timeToSend.getTime() + 24 * 60 * 60 * 1000) // Add one day
         }
       }
