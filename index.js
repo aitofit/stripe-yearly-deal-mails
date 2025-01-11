@@ -6,11 +6,12 @@ const { runEmailQueue } = require('./queuedEmails/jobs/mailerWorker')
 
 const main = async () => {
   // Run the program and print any thrown exceptions
+  console.log(`TIMESTAMP: ${new Date().toISOString()}`)
   console.log('Updating the target users...')
   await runFindUsers().catch(console.dir)
 
   // Uncomment if want to only find target users
-  // return
+  return
 
   console.log('----------------------------------------------------------------------------------')
   console.log('Processing the email queue...')
@@ -27,7 +28,7 @@ const main = async () => {
   }
 
   console.log('All mails sent!')
-  console.log(`Total emails sent: ${sumSentMails}`)
+  console.log(`Total emails sent: ${sumSentMails}\n\n`)
 }
 
 main()

@@ -4,6 +4,7 @@ const DEBUG = false
 const LATELY_UPDATED = 1 // months
 const LATELY_REGISTERED = 14 // days
 const MAILS_PER_DAY = 500
+const MAILS_PER_HOUR = 100
 
 const MongoClient = require('mongodb').MongoClient
 const cliProgress = require('cli-progress')
@@ -151,8 +152,19 @@ async function run() {
     let j = 0
     // Count how many emails can be added in the queue with the latest timeToSend before adding one day
     let timeCount = count % MAILS_PER_DAY
+    // Count how many emails can be added in the queue with the latest timeToSend before adding one hour
+    let hoursCount = count % MAILS_PER_HOUR
+
     let timeToSend =
-      timeCount !== 0 ? latestDate : new Date(latestDate.getTime() + 24 * 60 * 60 * 1000) // Add one day
+      timeCount !== 0
+        ? latestDate
+        : queueDocuments.length > 0
+        ? new Date(latestDate.getTime() + 24 * 60 * 60 * 1000) // Add one day
+        : new Date()
+
+    if (timeCount === 0) {
+      timeToSend.setHours(16, 0, 0, 0) // Set the initial time to 16:00
+    }
 
     // create a new progress bar instance and use shades_classic theme
     const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic)
@@ -172,10 +184,18 @@ async function run() {
 
         i += 1
         timeCount += 1
+        hoursCount += 1
+
+        // Adjust timeToSend for every MAILS_PER_HOUR emails
+        if (hoursCount % MAILS_PER_HOUR === 0) {
+          // Add one hour for every MAILS_PER_HOUR emails
+          timeToSend = new Date(timeToSend.getTime() + 60 * 60 * 1000) // Add 1 hour
+        }
 
         // Adjust timeToSend for every MAILS_PER_DAY emails
         if (timeCount % MAILS_PER_DAY === 0) {
           timeToSend = new Date(timeToSend.getTime() + 24 * 60 * 60 * 1000) // Add one day
+          timeToSend.setHours(16, 0, 0, 0) // Set the time to 16:00
         }
       }
       j += 1
