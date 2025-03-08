@@ -2,6 +2,7 @@ const dotenv = require('dotenv')
 dotenv.config({ path: `.env.${process.env.NODE_ENV}` })
 
 const { runFindUsers } = require('./findUsers')
+const { getHalfYearSubscriptionCustomers } = require('./halfYearUsers')
 const { runEmailQueue } = require('./queuedEmails/jobs/mailerWorker')
 
 const main = async () => {
@@ -9,6 +10,7 @@ const main = async () => {
   console.log(`TIMESTAMP: ${new Date().toISOString()}`)
   console.log('Updating the target users...')
   await runFindUsers().catch(console.dir)
+  await getHalfYearSubscriptionCustomers().catch(console.dir)
 
   // Uncomment if want to only find target users
   return
