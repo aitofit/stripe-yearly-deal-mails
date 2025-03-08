@@ -5,6 +5,7 @@ const nodemailerSendgrid = require('nodemailer-sendgrid')
 
 const MAIL_KEYS = {
   yearlyDeal: 'yearlyDeal',
+  halfYearDeal: 'halfYearDeal',
 }
 
 const mailerLanguages = ['fi', 'en', 'sv']
@@ -13,9 +14,12 @@ const TRANSACTIONAL_GROUP_ID = 174153
 const unsubGroupIds = [GENERAL_GROUP_ID]
 
 const prodTemplates = {
-  sender: { name: 'AITOFIT', address: 'valmennus@aitofit.io' },
+  sender: { name: 'AITOFIT', address: 'valmennus@aitofit.fi' },
   [MAIL_KEYS.yearlyDeal]: {
     fi: 'd-1f51a4df37a64f0192459de7121e0d08',
+  },
+  [MAIL_KEYS.halfYearDeal]: {
+    fi: 'd-0e3d52f4a6044a7193234b1e0f2fd4a1',
   },
 }
 

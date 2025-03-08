@@ -13,6 +13,10 @@ const { createEncodedUrl } = require('../../createDealLink')
 // const { captureException  } = require('@sentry/node')
 
 const yearlyDealTemplateKey = 'yearlyDeal'
+const sixMonthsDealTemplateKey = 'halfYearDeal'
+
+const SIX_MONTH_PRICE = process.env.SIX_MONTH_PRICE || 'price_1QsQjGHuqNLiyMGxDzPqjRWU' // test mode id
+const YEARLY_PRICE = process.env.YEARLY_PRICE || 'price_1Mc6PiHuqNLiyMGxdctmpvXw' // test mode id
 
 const options = { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 }
 const client = new MongoClient(process.env.DB_URI, options)
@@ -37,17 +41,20 @@ const transporter = nodemailer.createTransport(
  * @param {string} firstName - Recipients first name
  * @param {string} templateId - Id of email template in the mailing service
  * @param {ObjectId} emailId - Document id of the queued email
+ * @param {string} fromEmail - send email from this address
  *
  * @returns A Promise, which resolves on successful send and rejects on error.
  * Contains response/error and id of email document
  */
-const sendEmailPromisified = ({ email, firstName, stripeLink, templateId, emailId }) => {
+const sendEmailPromisified = ({ email, firstName, stripeLink, templateId, emailId, fromEmail }) => {
+  const _fromEmail = fromEmail || getSenderData().address
+  const _fromName = getSenderData().name
   return new Promise((resolve, reject) => {
     transporter.sendMail(
       {
-        from: getSenderData(),
+        from: { name: _fromName, address: _fromEmail },
         to: email,
-        subject: 'Nappaa vuoden treenit tarjous!', // Subject is overridden by template
+        subject: 'Nappaa tarjous!', // Subject is overridden by template
         dynamic_template_data: { firstName, stripeLink },
         templateId,
         asm: {
@@ -89,15 +96,18 @@ const sendQueuedEmails = (emailQueue) => {
       const emailPromises = []
 
       for (const next of emailQueue) {
-        const templateId = getTemplateIdByLanguage(yearlyDealTemplateKey, next.language)
+        const templateKey = next.sixMonths ? sixMonthsDealTemplateKey : yearlyDealTemplateKey
+        const templateId = getTemplateIdByLanguage(templateKey, next.language)
         if (!templateId) {
           throw new Error(
-            `Couldn't find template id for sending '${yearlyDealTemplateKey}' email in language '${next.language}`
+            `Couldn't find template id for sending '${templateKey}' email in language '${next.language}`
           )
           continue
         }
 
-        const stripeLink = createEncodedUrl(process.env.CHECKOUT_BASE_URL, next.email)
+        const priceId = next.sixMonths ? SIX_MONTH_PRICE : YEARLY_PRICE
+
+        const stripeLink = createEncodedUrl(process.env.CHECKOUT_BASE_URL, next.email, priceId)
 
         emailPromises.push(
           sendEmailPromisified({
@@ -106,6 +116,7 @@ const sendQueuedEmails = (emailQueue) => {
             stripeLink,
             templateId,
             emailId: next._id,
+            fromEmail: next.from_email,
           })
         )
       }
@@ -178,7 +189,13 @@ async function run() {
       await client
         .db()
         .collection('SentYearDealEmails')
-        .insertMany(emailsSent.map((sentMail) => ({ _id: sentMail._id, email: sentMail.email })))
+        .insertMany(
+          emailsSent.map((sentMail) =>
+            sentMail.sixMonths
+              ? { _id: sentMail._id, email: sentMail.email, sixMonths: true }
+              : { _id: sentMail._id, email: sentMail.email }
+          )
+        )
 
       console.log('Emails sent:', idsEmailWasSent.length)
       console.log('Emails not sent:', emailQueue.length - idsEmailWasSent.length)
